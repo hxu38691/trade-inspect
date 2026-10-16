@@ -1,16 +1,14 @@
 <!DOCTYPE html><html><head><meta charset=utf-8><title>Inspect shards</title>
 <style>body{font-family:system-ui;background:#0b0f14;color:#e6edf3;padding:24px;line-height:1.5}
 a{color:#58a6ff;font-size:17px} li{margin:8px 0} .note{opacity:.8;font-size:13px;max-width:760px}</style></head><body>
-<h2>Trade inspect (ctx128 + hold) — sharded &lt;20MB</h2>
-<p class="note">Each shard is self-contained. Prev/next + arrow keys; filters H1/H2/long/short work inside the shard. Charts show 128-bar model context before entry + hold through exit. No sampling — all trades covered across shards.</p>
-<h3>step4100</h3>
-<ul>
-<li><a href="inspect/inspect_s4100_H1.html">inspect_s4100_H1.html</a> — 3236 trades, 16.3 MB</li>
-<li><a href="inspect/inspect_s4100_H2.html">inspect_s4100_H2.html</a> — 3022 trades, 15.3 MB</li>
+<h2>Trade inspect (ctx128 + hold) — ne5 filter (last 5 bars nonempty), sharded &lt;20MB</h2>
+<p class='note'>Each shard is self-contained. Prev/next + arrow keys, filters H1/H2/long/short work inside the shard. Charts = 128-bar model context before entry + hold through exit.</p>
+<h3>step4100</h3><ul>
+<li><a href='inspect/inspect_s4100_H1.html'>inspect_s4100_H1.html</a> — 3177 trades, 15.9 MB</li>
+<li><a href='inspect/inspect_s4100_H2.html'>inspect_s4100_H2.html</a> — 2962 trades, 14.9 MB</li>
 </ul>
-<h3>E1 step1400</h3>
-<ul>
-<li><a href="inspect/inspect_e1_H1.html">inspect_e1_H1.html</a> — 3288 trades, 16.4 MB</li>
-<li><a href="inspect/inspect_e1_H2.html">inspect_e1_H2.html</a> — 3017 trades, 15.1 MB</li>
+<h3>E1 step1400</h3><ul>
+<li><a href='inspect/inspect_e1_H1.html'>inspect_e1_H1.html</a> — 3205 trades, 16.0 MB</li>
+<li><a href='inspect/inspect_e1_H2.html'>inspect_e1_H2.html</a> — 2951 trades, 14.8 MB</li>
 </ul>
 </body></html>
