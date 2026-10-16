@@ -1,14 +1,22 @@
 <!DOCTYPE html><html><head><meta charset=utf-8><title>Inspect shards</title>
 <style>body{font-family:system-ui;background:#0b0f14;color:#e6edf3;padding:24px;line-height:1.5}
-a{color:#58a6ff;font-size:17px} li{margin:8px 0} .note{opacity:.8;font-size:13px;max-width:760px}</style></head><body>
-<h2>Trade inspect (ctx128 + hold) — ne5 filter (last 5 bars nonempty), sharded &lt;20MB</h2>
-<p class='note'>Each shard is self-contained. Prev/next + arrow keys, filters H1/H2/long/short work inside the shard. Charts = 128-bar model context before entry + hold through exit.</p>
-<h3>step4100</h3><ul>
-<li><a href='inspect/inspect_s4100_H1.html'>inspect_s4100_H1.html</a> — 3177 trades, 15.9 MB</li>
-<li><a href='inspect/inspect_s4100_H2.html'>inspect_s4100_H2.html</a> — 2962 trades, 14.9 MB</li>
+a{color:#58a6ff;font-size:17px} li{margin:8px 0} .note{opacity:.8;font-size:13px;max-width:860px}
+h3{margin-top:28px;color:#d4760a} code{background:#1c2330;padding:1px 6px;border-radius:4px}</style></head><body>
+<h2>Trade inspect</h2>
+<p class='note'>Self-contained HTML. Arrow keys / prev-next. Charts = ctx128 + hold (or decision window).</p>
+
+<h3>Reverse 1% hold（fv2 ema_step3900）— 可筛选</h3>
+<p class='note'>规则：截面 demeaned z 进前1%开多、后1%开空；一直持有直到进入对端1%则反转开反向；中间无新信号继续持仓。筛选：有无信号 / 多头1%·空头1%·中间 / 是否曾进两端1% / 价格$50–100内外 / 当前持仓多·空·空仓。筛完列表和K线跟着变。</p>
+<ul>
+<li><a href='inspect/inspect_reverse_s3900.html'>inspect_reverse_s3900.html</a> — 4800 决策样本（含区间外），~27 MB</li>
+<li><a href='inspect/reverse_s3900_table.csv'>reverse_s3900_table.csv</a> — H1/H2/ALL 数字表（vs E1 abs1×50）</li>
 </ul>
-<h3>E1 step1400</h3><ul>
-<li><a href='inspect/inspect_e1_H1.html'>inspect_e1_H1.html</a> — 3205 trades, 16.0 MB</li>
-<li><a href='inspect/inspect_e1_H2.html'>inspect_e1_H2.html</a> — 2951 trades, 14.8 MB</li>
+
+<h3>E1 abs1×50 ne5（旧）</h3>
+<ul>
+<li><a href='inspect/inspect_s4100_H1.html'>inspect_s4100_H1.html</a> — step4100, 3177 trades</li>
+<li><a href='inspect/inspect_s4100_H2.html'>inspect_s4100_H2.html</a> — step4100, 2962 trades</li>
+<li><a href='inspect/inspect_e1_H1.html'>inspect_e1_H1.html</a> — E1 step1400, 3205 trades</li>
+<li><a href='inspect/inspect_e1_H2.html'>inspect_e1_H2.html</a> — E1 step1400, 2951 trades</li>
 </ul>
 </body></html>
