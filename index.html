@@ -6,6 +6,13 @@ h3{margin-top:28px;color:#d4760a} code{background:#1c2330;padding:1px 6px;border
 <h2>Trade inspect</h2>
 <p class='note'>Arrow keys / prev-next. Charts = ctx128 + hold. Lazy-loaded shards where noted.</p>
 
+<h3 id="s12000-pos098">s12000 VAL |pos|&gt;0.98（截面 pos，step12000 raw）— 全量逐笔</h3>
+<p class='warn'>4 个版本：出场 跌出前50% / 前5% × 止损 无 / SL20。全部已成交交易（无抽样），128 根 ctx + 持仓 K 线，真实价（复权价/rf）。可筛 多空 / H1 / H2 / 出场原因 / 代码 / 重复代码 & rf≠1 标记，按 net 排序。</p>
+<ul>
+<li><a href='inspect/s12000_pos098/'>inspect/s12000_pos098/</a> — 懒加载看板（none_x50 7034 · none_x5 8100 · sl20_x50 7339 · sl20_x5 8423 笔）</li>
+<li><a href='inspect/s12000_pos098/trades.csv'>trades.csv</a> — 逐笔 CSV（4 个版本）</li>
+</ul>
+
 <h3 id="s10000-ne5">s10000 E1 abs1×50 noempty5（ema_step10000 val）</h3>
 <p class='warn'>exit = <b>16:00 RTH close</b>（已修正）。原 bug 用 16:15 AH close → ALL CAGR +60.1%；修正后 ALL CAGR ~+41.5%。全量逐笔可审，H1/H2 可筛，按 net 排序。</p>
 <ul>

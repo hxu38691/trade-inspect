@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>s12000 VAL |pos|>0.98 — trade inspect</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#0b0f14;color:#e6edf3}
+.top{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid #222;flex-wrap:wrap;position:sticky;top:0;background:#0b0f14;z-index:5}
+.top button,.top select,.top input{background:#1c2330;color:#e6edf3;border:1px solid #333;border-radius:6px;padding:5px 8px}
+.top button{cursor:pointer}.top button:hover{background:#2a3344}
+label{font-size:12px;opacity:.8}
+#info{padding:6px 12px;font-size:13px;line-height:1.6}
+#info b{color:#fff}.flag{background:#6e2b0e;color:#ffb37a;border-radius:4px;padding:1px 6px;margin-left:6px;font-size:12px}
+.pos{color:#3fb950}.neg{color:#f85149}
+#chart{height:500px;margin:4px 12px 0}#vol{height:110px;margin:0 12px 6px}
+#sum,#note{font-size:12px;opacity:.85;padding:4px 12px;white-space:pre-wrap;font-family:ui-monospace,monospace}
+#list{margin:6px 12px 20px;font-size:12px;font-family:ui-monospace,monospace}
+#list table{border-collapse:collapse;width:100%}#list td,#list th{padding:2px 6px;border-bottom:1px solid #1c2330;text-align:right}
+#list tr{cursor:pointer}#list tr.cur{background:#1f3350}#list tr:hover{background:#18202c}
+#list td:nth-child(2),#list td:nth-child(3){text-align:left}
+</style></head><body>
+<div class="top">
+ <strong>s12000 VAL |pos|&gt;0.98</strong>
+ <label>出场<select id="ex"><option value="x50">跌出前50%</option><option value="x5">跌出前5%</option></select></label>
+ <label>止损<select id="sl"><option value="none">无</option><option value="sl20">SL20</option></select></label>
+ <label>方向<select id="side"><option value="all">多+空</option><option value="1">多</option><option value="-1">空</option></select></label>
+ <label>半段<select id="half"><option value="all">全期</option><option value="0">H1</option><option value="1">H2</option></select></label>
+ <label>出场原因<select id="kind"><option value="all">全部</option><option value="band">band</option><option value="eod">eod</option><option value="stop">stop</option></select></label>
+ <label>标记<select id="flag"><option value="all">全部</option><option value="dup">重复代码</option><option value="rf">rf≠1</option><option value="any">任一标记</option><option value="none">无标记</option></select></label>
+ <label>代码<input id="sym" list="symlist" size="7" placeholder="全部"></label><datalist id="symlist"></datalist>
+ <label>排序<select id="sort"><option value="t">时间</option><option value="nd">net ↓</option><option value="na">net ↑</option><option value="pd">|pos| ↓</option><option value="hd">持仓bar ↓</option></select></label>
+ <button onclick="nav(-1)">◀</button><span id="idx">0/0</span><button onclick="nav(1)">▶</button>
+</div>
+<div id="info"></div>
+<div id="chart"></div><div id="vol"></div>
+<pre id="note"></pre><pre id="sum"></pre>
+<div id="list"></div>
+<script>
+let M,C,N,view=[],cur=0,chart,cs,vc,vs;const cache=new Map();
+const $=id=>document.getElementById(id);
+const fmtET=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
+const offC=new Map();
+function etOff(t){const k=Math.floor(t/43200);if(offC.has(k))return offC.get(k);const p={};fmtET.formatToParts(new Date(t*1000)).forEach(x=>p[x.type]=x.value);
+ const asUTC=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour%24,+p.minute)/1000;const o=asUTC-t;offC.set(k,o);return o}
+function et(t){const s=new Date((t+etOff(t))*1000).toISOString();return s.slice(0,10)+' '+s.slice(11,16)}
+async function boot(){
+ $('info').textContent='loading trades.json…';M=await (await fetch('trades.json')).json();C=M.cols;N=C.v.length;
+ $('symlist').innerHTML=M.tickers.map(t=>`<option value="${t}">`).join('');
+ const c=M.counts;$('note').textContent=`${M.title}\n笔数（已成交）: `+M.ver.map(v=>`${v}=${c[v].all} (H1 ${c[v].H1}/H2 ${c[v].H2}, 多${c[v].long}/空${c[v].short}, stop ${c[v].stop}, 重复代码 ${c[v].dup}, rf≠1 ${c[v].rf_ne1})`).join('\n')+
+ `\nH1=2023-06-26..2024-04-11  H2=2024-04-12..2025-01-31。K线=入场前完整128根15m RTH bar + 持仓bar（全部bar，非只信号bar），价格=真实价（复权价/rf，逐日rf）。时间=ET。\n重复代码对: RDZN/VHNA, GMHS/GODN, MCTR/TJGC（同一只票两个代码，同一笔被算两次）。\n规则: ${M.rule}\npos: ${M.pos}`;
+ $('sum').textContent=M.summary.map(r=>`${r.exit.padEnd(9)} ${r.half.padEnd(4)} n=${String(r.n_kept_A).padStart(5)} win=${(r.win*100).toFixed(1)}% ${r.bps.toFixed(1)}bp CAGR=${(r.cagr*100).toFixed(0)}% Sh=${r.sharpe.toFixed(2)} MDD=${(r.mdd*100).toFixed(1)}%`).join('\n');
+ const q=new URLSearchParams(location.search);for(const k of ['ex','sl','side','half','kind','flag','sym','sort'])if(q.get(k)!=null)$(k).value=q.get(k);
+ for(const k of ['ex','sl','side','half','kind','flag','sort'])$(k).onchange=refilter;$('sym').onchange=refilter;$('sym').oninput=()=>{const v=$('sym').value.toUpperCase();if(v===''||M.tickers.includes(v))refilter()};
+ refilter();if(q.get('i')){const j=view.indexOf(+q.get('i'));if(j>=0){cur=j;render()}}
+}
+function isDup(i){return M.dup[M.tickers[C.tk[i]]]!==undefined}
+function isRf(i){return C.rf[i]!==1||C.rmin[i]!==1||C.rmax[i]!==1}
+function refilter(){
+ const ver=M.ver.indexOf($('sl').value+'_'+$('ex').value),sd=$('side').value,h=$('half').value,kd=$('kind').value,fl=$('flag').value,sy=$('sym').value.toUpperCase(),so=$('sort').value;
+ const ti=sy?M.tickers.indexOf(sy):-2;view=[];
+ for(let i=0;i<N;i++){if(C.v[i]!==ver)continue;if(sd!=='all'&&C.sd[i]!==+sd)continue;if(h!=='all'&&C.h[i]!==+h)continue;
+  if(kd!=='all'&&M.kind[C.k[i]]!==kd)continue;if(ti!==-2&&C.tk[i]!==ti)continue;
+  if(fl!=='all'){const d=isDup(i),r=isRf(i);if(fl==='dup'&&!d||fl==='rf'&&!r||fl==='any'&&!(d||r)||fl==='none'&&(d||r))continue}
+  view.push(i)}
+ const f={t:(a,b)=>C.es[a]-C.es[b],nd:(a,b)=>C.net[b]-C.net[a],na:(a,b)=>C.net[a]-C.net[b],pd:(a,b)=>Math.abs(C.pos[b])-Math.abs(C.pos[a]),hd:(a,b)=>C.hb[b]-C.hb[a]}[so];
+ view.sort(f);cur=0;render();
+}
+function nav(d){if(!view.length)return;cur=(cur+d+view.length)%view.length;render()}
+async function shard(s){if(cache.has(s))return cache.get(s);const p=fetch(`shards/s${String(s).padStart(4,'0')}.bin`).then(r=>{if(!r.ok)throw r.status;return r.arrayBuffer()});cache.set(s,p);if(cache.size>30)cache.delete(cache.keys().next().value);return p}
+function charts(){if(chart)return;const o={layout:{background:{color:'#0b0f14'},textColor:'#c9d1d9'},grid:{vertLines:{color:'#1c2330'},horzLines:{color:'#1c2330'}},rightPriceScale:{minimumWidth:80}};
+ chart=LightweightCharts.createChart($('chart'),{...o,timeScale:{timeVisible:true,secondsVisible:false},localization:{timeFormatter:t=>et(t)}});
+ cs=chart.addCandlestickSeries({upColor:'#3fb950',downColor:'#f85149',borderVisible:false,wickUpColor:'#3fb950',wickDownColor:'#f85149'});
+ vc=LightweightCharts.createChart($('vol'),{...o,timeScale:{visible:false}});vs=vc.addHistogramSeries({priceFormat:{type:'volume'}});
+ chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r)vc.timeScale().setVisibleLogicalRange(r)});
+ chart.applyOptions({timeScale:{tickMarkFormatter:t=>et(t).slice(5)}});}
+let lines=[];
+async function render(){
+ charts();$('idx').textContent=view.length?`${cur+1}/${view.length}`:'0/0';
+ if(!view.length){$('info').textContent='无交易';cs.setData([]);vs.setData([]);drawList();return}
+ const i=view[cur],tk=M.tickers[C.tk[i]],kind=M.kind[C.k[i]],ver=M.ver[C.v[i]];
+ const fl=(isDup(i)?`<span class=flag>重复代码 ${tk}/${M.dup[tk]}</span>`:'')+(isRf(i)?`<span class=flag>rf≠1（入场日rf=${C.rf[i]}，窗口rf ${C.rmin[i]}–${C.rmax[i]}）</span>`:'');
+ const others=[];for(let j=Math.max(0,i-8);j<Math.min(N,i+9);j++)if(j!==i&&C.w[j]===C.w[i])others.push(`${M.ver[C.v[j]]}: ${C.net[j]>0?'+':''}${C.net[j]}bp ${M.kind[C.k[j]]}`);
+ $('info').innerHTML=`<b>${tk}</b> ${C.sd[i]>0?'<span class=pos>多</span>':'<span class=neg>空</span>'} · ${ver} · H${C.h[i]+1} · pos=${C.pos[i].toFixed(5)} · 入场 <b>${et(C.es[i])}</b> @ ${C.epx[i]} · 出场 <b>${et(C.xs[i])}</b> @ ${C.xpx[i].toFixed(4)} (<b>${kind}</b>) · 持仓 ${C.hb[i]} bar · 决策价 ${C.dpx[i]} · gross ${C.gr[i]}bp · <b class=${C.net[i]>0?'pos':'neg'}>net ${C.net[i]>0?'+':''}${C.net[i]}bp (${(C.net[i]/100).toFixed(2)}%)</b>${fl}`+(others.length?`<br><span style="opacity:.7">同一入场其他版本: ${others.join(' | ')}</span>`:'');
+ const q=new URLSearchParams();for(const k of ['ex','sl','side','half','kind','flag','sym','sort'])q.set(k,$(k).value);q.set('i',i);history.replaceState(null,'','?'+q);
+ drawList();
+ let buf;try{buf=await shard(C.sh[i])}catch(e){$('info').innerHTML+=' [shard加载失败 '+e+']';return}
+ if(view[cur]!==i)return;
+ const n=C.n[i],er=C.er[i],dv=new DataView(buf,C.so[i],n*24),bars=[];
+ for(let k=0;k<n;k++){const o=k*24;bars.push({time:dv.getUint32(o,true),open:dv.getFloat32(o+4,true),high:dv.getFloat32(o+8,true),low:dv.getFloat32(o+12,true),close:dv.getFloat32(o+16,true),v:dv.getFloat32(o+20,true)})}
+ const xs=C.xs[i];let xr=bars.findIndex(b=>b.time===xs);if(kind!=='band'||xr<0){xr=0;for(let k=0;k<n;k++)if(bars[k].time<xs)xr=k}
+ cs.setData(bars.map((b,k)=>{const up=b.close>=b.open,hold=k>=er&&k<=xr;return{time:b.time,open:b.open,high:b.high,low:b.low,close:b.close,
+  color:hold?(up?'#3fb950':'#f85149'):(up?'#2a6b3a':'#7a2e2b'),wickColor:hold?(up?'#3fb950':'#f85149'):(up?'#2a6b3a':'#7a2e2b')}}));
+ vs.setData(bars.map(b=>({time:b.time,value:b.v,color:b.close>=b.open?'#3fb95066':'#f8514966'})));
+ const mk=[];let pd=null;for(const b of bars){const d=et(b.time).slice(0,10);if(d!==pd){mk.push({time:b.time,position:'aboveBar',color:'#8b949e',shape:'square',size:0.4,text:d.slice(5)});pd=d}}
+ mk.push({time:bars[0].time,position:'belowBar',color:'#a371f7',shape:'circle',size:0.6,text:`ctx ${er} bar`});
+ mk.push({time:bars[er].time,position:C.sd[i]>0?'belowBar':'aboveBar',color:'#58a6ff',shape:C.sd[i]>0?'arrowUp':'arrowDown',text:(C.sd[i]>0?'买入 ':'卖空 ')+C.epx[i]});
+ mk.push({time:bars[xr].time,position:C.sd[i]>0?'aboveBar':'belowBar',color:kind==='stop'?'#ff00ff':'#d4760a',shape:kind==='stop'?'square':'circle',text:(kind==='stop'?'止损 ':kind==='eod'?'16:00平 ':'band出 ')+C.xpx[i].toFixed(2)});
+ mk.sort((a,b)=>a.time-b.time);cs.setMarkers(mk);
+ lines.forEach(l=>cs.removePriceLine(l));lines=[cs.createPriceLine({price:C.epx[i],color:'#58a6ff',lineStyle:2,lineWidth:1,title:'entry'}),cs.createPriceLine({price:C.xpx[i],color:kind==='stop'?'#ff00ff':'#d4760a',lineStyle:2,lineWidth:1,title:'exit'})];
+ if(ver.startsWith('sl20'))lines.push(cs.createPriceLine({price:C.epx[i]*(1-0.2*C.sd[i]),color:'#ff00ff',lineStyle:1,lineWidth:1,title:'SL20'}));
+ chart.timeScale().fitContent();
+}
+function drawList(){const P=100,p0=Math.floor(cur/P)*P,rows=[];
+ for(let k=p0;k<Math.min(view.length,p0+P);k++){const i=view[k],tk=M.tickers[C.tk[i]];rows.push(`<tr class="${k===cur?'cur':''}" onclick="cur=${k};render()"><td>${k+1}</td><td>${tk}${isDup(i)?' ⚠dup':''}${isRf(i)?' ⚠rf':''}</td><td>${et(C.es[i])} → ${et(C.xs[i]).slice(11)}</td><td>${C.sd[i]>0?'多':'空'}</td><td>${C.pos[i].toFixed(4)}</td><td>${C.epx[i]}</td><td>${C.xpx[i].toFixed(2)}</td><td class=${C.net[i]>0?'pos':'neg'}>${C.net[i]}</td><td>${M.kind[C.k[i]]}</td><td>${C.hb[i]}</td></tr>`)}
+ $('list').innerHTML=`<div>列表 ${p0+1}–${Math.min(view.length,p0+P)} / ${view.length}（点行跳转；←/→ 翻笔）</div><table><tr><th>#</th><th>代码</th><th>入场→出场 (ET)</th><th>方向</th><th>pos</th><th>入场价</th><th>出场价</th><th>net bp</th><th>原因</th><th>bar</th></tr>${rows.join('')}</table>`}
+document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;if(e.key==='ArrowLeft')nav(-1);if(e.key==='ArrowRight')nav(1)});
+boot();
+</script></body></html>
