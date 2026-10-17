@@ -1,12 +1,20 @@
 <!DOCTYPE html><html><head><meta charset=utf-8><title>Inspect shards</title>
 <style>body{font-family:system-ui;background:#0b0f14;color:#e6edf3;padding:24px;line-height:1.5}
 a{color:#58a6ff;font-size:17px} li{margin:8px 0} .note{opacity:.8;font-size:13px;max-width:860px}
-h3{margin-top:28px;color:#d4760a} code{background:#1c2330;padding:1px 6px;border-radius:4px}</style></head><body>
+h3{margin-top:28px;color:#d4760a} code{background:#1c2330;padding:1px 6px;border-radius:4px}
+.warn{color:#f0a030;max-width:900px}</style></head><body>
 <h2>Trade inspect</h2>
-<p class='note'>Self-contained HTML. Arrow keys / prev-next. Charts = ctx128 + hold (or decision window).</p>
+<p class='note'>Arrow keys / prev-next. Charts = ctx128 + hold. Lazy-loaded shards where noted.</p>
+
+<h3 id="s10000-ne5">s10000 E1 abs1×50 noempty5（ema_step10000 val）</h3>
+<p class='warn'>exit = <b>16:00 RTH close</b>（已修正）。原 bug 用 16:15 AH close → ALL CAGR +60.1%；修正后 ALL CAGR ~+41.5%。全量逐笔可审，H1/H2 可筛，按 net 排序。</p>
+<ul>
+<li><a href='inspect/s10000_ne5/'>inspect/s10000_ne5/</a> — 全量交易懒加载看板（K线+成交量，prev/next）</li>
+<li><a href='inspect/s10000_ne5/trades.csv'>trades.csv</a> — 逐笔 CSV</li>
+</ul>
 
 <h3>Reverse 1% hold（fv2 ema_step3900）— 可筛选</h3>
-<p class='note'>规则：截面 demeaned z 进前1%开多、后1%开空；一直持有直到进入对端1%则反转开反向；中间无新信号继续持仓。筛选：有无信号 / 多头1%·空头1%·中间 / 是否曾进两端1% / 价格$50–100内外 / 当前持仓多·空·空仓。筛完列表和K线跟着变。</p>
+<p class='note'>规则：截面 demeaned z 进前1%开多、后1%开空；一直持有直到进入对端1%则反转开反向；中间无新信号继续持仓。</p>
 <ul>
 <li><a href='inspect/inspect_reverse_s3900.html'>inspect_reverse_s3900.html</a> — 4800 决策样本（含区间外），~27 MB</li>
 <li><a href='inspect/reverse_s3900_table.csv'>reverse_s3900_table.csv</a> — H1/H2/ALL 数字表（vs E1 abs1×50）</li>

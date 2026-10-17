@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>s10000 E1 abs1x50 noempty5 RTH960 — trade inspect</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#0b0f14;color:#e6edf3}
+.top{display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid #222;flex-wrap:wrap;position:sticky;top:0;background:#0b0f14;z-index:5}
+.top button,.top select{background:#1c2330;color:#e6edf3;border:1px solid #333;border-radius:6px;padding:6px 10px;cursor:pointer}
+.top button:hover{background:#2a3344}
+#meta{font-size:13px;opacity:.95;flex:1;min-width:280px}
+#chart{height:520px;margin:8px 12px 0}
+#vol{height:120px;margin:0 12px 8px}
+#note,#sumbox{font-size:12px;opacity:.85;padding:6px 14px;white-space:pre-wrap}
+.badge{background:#21262d;border-radius:4px;padding:2px 8px;font-size:12px}
+</style></head><body>
+<div class="top">
+  <strong class="badge">s10000 E1 abs1×50 + noempty5 · 16:00 RTH</strong>
+  <button onclick="nav(-1)">◀ prev</button>
+  <button onclick="nav(1)">next ▶</button>
+  <span id="idx">0/0</span>
+  <select id="half" onchange="refilter()"><option value="ALL">ALL</option><option value="H1">H1</option><option value="H2">H2</option></select>
+  <select id="side" onchange="refilter()"><option value="ALL">long+short</option><option value="1">long</option><option value="-1">short</option></select>
+  <select id="wl" onchange="refilter()"><option value="ALL">win+loss</option><option value="W">win</option><option value="L">loss</option></select>
+  <select id="sort" onchange="refilter()">
+    <option value="i">sort: time</option>
+    <option value="net_desc">sort: net ↓</option>
+    <option value="net_asc">sort: net ↑</option>
+    <option value="hold_desc">sort: hold ↓</option>
+    <option value="absz_desc">sort: |z| ↓</option>
+  </select>
+  <span id="meta"></span>
+</div>
+<div id="warn" style="color:#f0a030;background:#2a1f0a;border:1px solid #d4760a;border-radius:6px;padding:8px 12px;margin:8px 14px;font-size:13px"></div>
+<div id="note"></div>
+<pre id="sumbox"></pre>
+<div id="chart"></div>
+<div id="vol"></div>
+<script>
+const BASE = new URL('.', location.href).pathname; // trailing /
+let META = null, view = [], cur = 0;
+const shardCache = new Map(); // shardId -> ArrayBuffer
+let chart, series, volChart, volSeries;
+const CTX_SAFE = 128;
+
+async function boot() {
+  document.getElementById('meta').textContent = 'loading trades.json…';
+  const r = await fetch('trades.json');
+  META = await r.json();
+  document.getElementById('warn').textContent = META.exit_bug_note || 'exit uses 16:00 RTH close (CORRECTED). Prior 16:15 AH bug ALL CAGR +60.1% → corrected ~+41.5%.';
+  document.getElementById('note').textContent =
+    `${META.title}  n=${META.n} (H1=${META.n_h1} H2=${META.n_h2})  ·  ${META.prices_note}\n规则: ${META.rule}`;
+  const sm = META.summary_corrected || META.summary || {};
+  const lines = [];
+  for (const [k, label] of [['noempty5_H1','H1'],['noempty5_H2','H2'],['noempty5_ALL','ALL']]) {
+    const s = sm[k]; if (!s) continue;
+    const cagr = (s.a_cagr!=null ? (+s.a_cagr)*100 : +s.ret_pct);
+    const sharpe = s.a_sharpe!=null ? s.a_sharpe : s.sharpe;
+    const mdd = s.a_mdd!=null ? s.a_mdd : s.mdd;
+    lines.push(`${label}: n=${s.n} bp=${(+s.bps).toFixed(1)} CAGR=${cagr.toFixed(1)}% Sh=${(+sharpe).toFixed(2)} MDD=${((+mdd)*100).toFixed(1)}%`);
+  }
+  document.getElementById('sumbox').textContent = lines.join('\n');
+  // deep-link ?i=N or ?half=H1
+  const q = new URLSearchParams(location.search);
+  if (q.get('half')) document.getElementById('half').value = q.get('half');
+  if (q.get('side')) document.getElementById('side').value = q.get('side');
+  refilter();
+  if (q.get('i') != null) {
+    const want = +q.get('i');
+    const j = view.findIndex(t => t.i === want);
+    if (j >= 0) { cur = j; render(); }
+  }
+}
+
+function refilter() {
+  const half = document.getElementById('half').value;
+  const side = document.getElementById('side').value;
+  const wl = document.getElementById('wl').value;
+  const sort = document.getElementById('sort').value;
+  view = META.trades.filter(t =>
+    (half==='ALL' || t.half===half) &&
+    (side==='ALL' || String(t.side)===side) &&
+    (wl==='ALL' || (wl==='W' ? t.net>0 : t.net<=0))
+  );
+  const cmp = {
+    i: (a,b)=>a.i-b.i,
+    net_desc: (a,b)=>b.net-a.net,
+    net_asc: (a,b)=>a.net-b.net,
+    hold_desc: (a,b)=>b.hold-a.hold,
+    absz_desc: (a,b)=>Math.abs(b.z)-Math.abs(a.z),
+  }[sort] || ((a,b)=>a.i-b.i);
+  view.sort(cmp);
+  cur = 0; render();
+}
+
+function nav(d) { if (!view.length) return; cur = (cur + d + view.length) % view.length; render(); }
+
+async function getShard(id) {
+  if (shardCache.has(id)) return shardCache.get(id);
+  const r = await fetch(`shards/s${String(id).padStart(4,'0')}.bin`);
+  const buf = await r.arrayBuffer();
+  shardCache.set(id, buf);
+  // cap cache
+  if (shardCache.size > 12) {
+    const first = shardCache.keys().next().value;
+    shardCache.delete(first);
+  }
+  return buf;
+}
+
+function decodeBars(buf, off, len) {
+  if (off < 0 || len < 7) return null;
+  const dv = new DataView(buf, off, len);
+  const n = dv.getUint16(0, true), er = dv.getUint16(2, true), xr = dv.getUint16(4, true);
+  const bars = [];
+  for (let i=0;i<n;i++) {
+    const o = 6 + i*24;
+    bars.push({
+      time: dv.getInt32(o, true),
+      open: dv.getInt32(o+4, true)/10000,
+      high: dv.getInt32(o+8, true)/10000,
+      low: dv.getInt32(o+12, true)/10000,
+      close: dv.getInt32(o+16, true)/10000,
+      volume: dv.getUint32(o+20, true),
+    });
+  }
+  return {bars, er, xr};
+}
+
+function ensureCharts() {
+  if (chart) return;
+  chart = LightweightCharts.createChart(document.getElementById('chart'), {
+    layout: {background:{color:'#0b0f14'}, textColor:'#c9d1d9'},
+    grid: {vertLines:{color:'#1c2330'}, horzLines:{color:'#1c2330'}},
+    timeScale: {timeVisible:true, secondsVisible:false},
+  });
+  series = chart.addCandlestickSeries({upColor:'#3fb950', downColor:'#f85149', borderVisible:false, wickUpColor:'#3fb950', wickDownColor:'#f85149'});
+  volChart = LightweightCharts.createChart(document.getElementById('vol'), {
+    layout: {background:{color:'#0b0f14'}, textColor:'#c9d1d9'},
+    grid: {vertLines:{color:'#1c2330'}, horzLines:{color:'#1c2330'}},
+    timeScale: {visible:false},
+  });
+  volSeries = volChart.addHistogramSeries({color:'#388bfd88'});
+  chart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) volChart.timeScale().setVisibleLogicalRange(r); });
+}
+
+async function render() {
+  ensureCharts();
+  document.getElementById('idx').textContent = view.length ? `${cur+1}/${view.length}` : '0/0';
+  if (!view.length) { document.getElementById('meta').textContent = 'no trades'; return; }
+  const t = view[cur];
+  const side = t.side>0 ? 'LONG' : 'SHORT';
+  document.getElementById('meta').textContent =
+    `#${t.i} ${t.sym} ${side} ${t.half} day=${t.day} z=${t.z.toFixed(3)} hold=${t.hold}  gross=${t.gbp}bp fee=${t.fbp}bp net=${t.bp}bp  entry=${t.epx} exit=${t.xpx}`;
+  // update url without reload
+  const q = new URLSearchParams(location.search);
+  q.set('i', String(t.i));
+  history.replaceState(null, '', '?' + q.toString());
+  if (t.off < 0) { series.setData([]); volSeries.setData([]); document.getElementById('meta').textContent += '  [no bars]'; return; }
+  try {
+    const buf = await getShard(t.shard);
+    // if user navigated away while loading, skip
+    if (view[cur] !== t) return;
+    const win = decodeBars(buf, t.off, t.len);
+    if (!win) { series.setData([]); volSeries.setData([]); return; }
+    const {bars, er, xr} = win;
+    const dayMarks = [];
+    let prevDay = null;
+    for (let i=0;i<bars.length;i++) {
+      const key = new Date(bars[i].time*1000).toISOString().slice(0,10);
+      if (key !== prevDay) { dayMarks.push({time: bars[i].time, position:'aboveBar', color:'#8b949e', shape:'arrowDown', text: key.slice(5)}); prevDay = key; }
+    }
+    series.setData(bars.filter(b => b.open>0).map(b => ({time:b.time, open:b.open, high:b.high, low:b.low, close:b.close})));
+    volSeries.setData(bars.map(b => ({time:b.time, value:b.volume, color: b.close>=b.open ? '#3fb95055' : '#f8514955'})));
+    const marks = [...dayMarks];
+    if (bars[er]) marks.push({time: bars[er].time, position: t.side>0?'belowBar':'aboveBar', color:'#58a6ff', shape: t.side>0?'arrowUp':'arrowDown', text:'ENTRY'});
+    if (bars[xr]) marks.push({time: bars[xr].time, position:'aboveBar', color:'#d4760a', shape:'circle', text:'EXIT'});
+    if (er>0) marks.push({time: bars[Math.max(0,er-CTX_SAFE)].time, position:'aboveBar', color:'#a371f7', shape:'square', text:'ctx128'});
+    series.setMarkers(marks.sort((a,b)=>a.time-b.time));
+    chart.timeScale().fitContent();
+  } catch (e) {
+    document.getElementById('meta').textContent += '  [shard load error: ' + e + ']';
+  }
+}
+document.addEventListener('keydown', e => {
+  if (e.key==='ArrowLeft') nav(-1);
+  if (e.key==='ArrowRight') nav(1);
+});
+boot();
+</script></body></html>
