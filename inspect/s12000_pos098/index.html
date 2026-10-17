@@ -19,6 +19,7 @@ label{font-size:12px;opacity:.8}
 </style></head><body>
 <div class="top">
  <strong>s12000 VAL |pos|&gt;0.98</strong>
+ <label>过滤<select id="flt"><option value="none">none</option><option value="ne5">noempty5</option></select></label>
  <label>出场<select id="ex"><option value="x50">跌出前50%</option><option value="x5">跌出前5%</option></select></label>
  <label>止损<select id="sl"><option value="none">无</option><option value="sl20">SL20</option></select></label>
  <label>方向<select id="side"><option value="all">多+空</option><option value="1">多</option><option value="-1">空</option></select></label>
@@ -45,16 +46,16 @@ async function boot(){
  $('info').textContent='loading trades.json…';M=await (await fetch('trades.json')).json();C=M.cols;N=C.v.length;
  $('symlist').innerHTML=M.tickers.map(t=>`<option value="${t}">`).join('');
  const c=M.counts;$('note').textContent=`${M.title}\n笔数（已成交）: `+M.ver.map(v=>`${v}=${c[v].all} (H1 ${c[v].H1}/H2 ${c[v].H2}, 多${c[v].long}/空${c[v].short}, stop ${c[v].stop}, 重复代码 ${c[v].dup}, rf≠1 ${c[v].rf_ne1})`).join('\n')+
- `\nH1=2023-06-26..2024-04-11  H2=2024-04-12..2025-01-31。K线=入场前完整128根15m RTH bar + 持仓bar（全部bar，非只信号bar），价格=真实价（复权价/rf，逐日rf）。时间=ET。\n重复代码对: RDZN/VHNA, GMHS/GODN, MCTR/TJGC（同一只票两个代码，同一笔被算两次）。\n规则: ${M.rule}\npos: ${M.pos}`;
+ `\nH1=2023-06-26..2024-04-11  H2=2024-04-12..2025-01-31。K线=入场前完整128根15m RTH bar + 持仓bar（全部bar，非只信号bar），价格=真实价（复权价/rf，逐日rf）。时间=ET。\n过滤: none=无过滤；noempty5=入场决策前最近5根ctx bar有空bar（或不连续）则不开仓。ne5_*=noempty5版本。\n重复代码对: RDZN/VHNA, GMHS/GODN, MCTR/TJGC（同一只票两个代码，同一笔被算两次）。\n规则: ${M.rule}\npos: ${M.pos}`;
  $('sum').textContent=M.summary.map(r=>`${r.exit.padEnd(9)} ${r.half.padEnd(4)} n=${String(r.n_kept_A).padStart(5)} win=${(r.win*100).toFixed(1)}% ${r.bps.toFixed(1)}bp CAGR=${(r.cagr*100).toFixed(0)}% Sh=${r.sharpe.toFixed(2)} MDD=${(r.mdd*100).toFixed(1)}%`).join('\n');
- const q=new URLSearchParams(location.search);for(const k of ['ex','sl','side','half','kind','flag','sym','sort'])if(q.get(k)!=null)$(k).value=q.get(k);
- for(const k of ['ex','sl','side','half','kind','flag','sort'])$(k).onchange=refilter;$('sym').onchange=refilter;$('sym').oninput=()=>{const v=$('sym').value.toUpperCase();if(v===''||M.tickers.includes(v))refilter()};
+ const q=new URLSearchParams(location.search);for(const k of ['flt','ex','sl','side','half','kind','flag','sym','sort'])if(q.get(k)!=null)$(k).value=q.get(k);
+ for(const k of ['flt','ex','sl','side','half','kind','flag','sort'])$(k).onchange=refilter;$('sym').onchange=refilter;$('sym').oninput=()=>{const v=$('sym').value.toUpperCase();if(v===''||M.tickers.includes(v))refilter()};
  refilter();if(q.get('i')){const j=view.indexOf(+q.get('i'));if(j>=0){cur=j;render()}}
 }
 function isDup(i){return M.dup[M.tickers[C.tk[i]]]!==undefined}
 function isRf(i){return C.rf[i]!==1||C.rmin[i]!==1||C.rmax[i]!==1}
 function refilter(){
- const ver=M.ver.indexOf($('sl').value+'_'+$('ex').value),sd=$('side').value,h=$('half').value,kd=$('kind').value,fl=$('flag').value,sy=$('sym').value.toUpperCase(),so=$('sort').value;
+ const ver=M.ver.indexOf(($('flt').value==='ne5'?'ne5_':'')+$('sl').value+'_'+$('ex').value),sd=$('side').value,h=$('half').value,kd=$('kind').value,fl=$('flag').value,sy=$('sym').value.toUpperCase(),so=$('sort').value;
  const ti=sy?M.tickers.indexOf(sy):-2;view=[];
  for(let i=0;i<N;i++){if(C.v[i]!==ver)continue;if(sd!=='all'&&C.sd[i]!==+sd)continue;if(h!=='all'&&C.h[i]!==+h)continue;
   if(kd!=='all'&&M.kind[C.k[i]]!==kd)continue;if(ti!==-2&&C.tk[i]!==ti)continue;
@@ -77,9 +78,9 @@ async function render(){
  if(!view.length){$('info').textContent='无交易';cs.setData([]);vs.setData([]);drawList();return}
  const i=view[cur],tk=M.tickers[C.tk[i]],kind=M.kind[C.k[i]],ver=M.ver[C.v[i]];
  const fl=(isDup(i)?`<span class=flag>重复代码 ${tk}/${M.dup[tk]}</span>`:'')+(isRf(i)?`<span class=flag>rf≠1（入场日rf=${C.rf[i]}，窗口rf ${C.rmin[i]}–${C.rmax[i]}）</span>`:'');
- const others=[];for(let j=Math.max(0,i-8);j<Math.min(N,i+9);j++)if(j!==i&&C.w[j]===C.w[i])others.push(`${M.ver[C.v[j]]}: ${C.net[j]>0?'+':''}${C.net[j]}bp ${M.kind[C.k[j]]}`);
+ const others=[];for(let j=Math.max(0,i-16);j<Math.min(N,i+17);j++)if(j!==i&&C.tk[j]===C.tk[i]&&C.es[j]===C.es[i])others.push(`${M.ver[C.v[j]]}: ${C.net[j]>0?'+':''}${C.net[j]}bp ${M.kind[C.k[j]]}`);
  $('info').innerHTML=`<b>${tk}</b> ${C.sd[i]>0?'<span class=pos>多</span>':'<span class=neg>空</span>'} · ${ver} · H${C.h[i]+1} · pos=${C.pos[i].toFixed(5)} · 入场 <b>${et(C.es[i])}</b> @ ${C.epx[i]} · 出场 <b>${et(C.xs[i])}</b> @ ${C.xpx[i].toFixed(4)} (<b>${kind}</b>) · 持仓 ${C.hb[i]} bar · 决策价 ${C.dpx[i]} · gross ${C.gr[i]}bp · <b class=${C.net[i]>0?'pos':'neg'}>net ${C.net[i]>0?'+':''}${C.net[i]}bp (${(C.net[i]/100).toFixed(2)}%)</b>${fl}`+(others.length?`<br><span style="opacity:.7">同一入场其他版本: ${others.join(' | ')}</span>`:'');
- const q=new URLSearchParams();for(const k of ['ex','sl','side','half','kind','flag','sym','sort'])q.set(k,$(k).value);q.set('i',i);history.replaceState(null,'','?'+q);
+ const q=new URLSearchParams();for(const k of ['flt','ex','sl','side','half','kind','flag','sym','sort'])q.set(k,$(k).value);q.set('i',i);history.replaceState(null,'','?'+q);
  drawList();
  let buf;try{buf=await shard(C.sh[i])}catch(e){$('info').innerHTML+=' [shard加载失败 '+e+']';return}
  if(view[cur]!==i)return;
