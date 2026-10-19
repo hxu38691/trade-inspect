@@ -6,6 +6,14 @@ h3{margin-top:28px;color:#d4760a} code{background:#1c2330;padding:1px 6px;border
 <h2>Trade inspect</h2>
 <p class='note'>Arrow keys / prev-next. Charts = ctx128 + hold. Lazy-loaded shards where noted.</p>
 
+
+<h3 id="e1fv2-short-avg5">e1fv2@19400 SHORT · avg5&gt;$2M（$10万吃不到5%）</h3>
+<p class='warn'>全市场截面空头 pos&amp;lt;−0.98；流动性筛：近5根平均成交额 &gt; $2M。对照未筛 vs 筛后 CAGR/Sharpe/权益曲线。</p>
+<ul>
+<li><a href='inspect/e1fv2_short_avg5_lt5pct/'>inspect/e1fv2_short_avg5_lt5pct/</a> — 交互看板（权益曲线 + 对照表）</li>
+<li><a href='inspect/e1fv2_short_avg5_lt5pct/table.csv'>table.csv</a> · <a href='inspect/e1fv2_short_avg5_lt5pct/summary.json'>summary.json</a> · <a href='inspect/e1fv2_short_avg5_lt5pct/equity.png'>equity.png</a></li>
+</ul>
+
 <h3 id="s12000-pos098">s12000 VAL |pos|&gt;0.98（截面 pos，step12000 raw）— 全量逐笔</h3>
 <p class='warn'>8 个版本：过滤 none / noempty5 × 出场 跌出前50% / 前5% × 止损 无 / SL20。全部已成交交易（无抽样），128 根 ctx + 持仓 K 线，真实价（复权价/rf）。可筛 多空 / H1 / H2 / 出场原因 / 代码 / 重复代码 & rf≠1 标记，按 net 排序。</p>
 <ul>

@@ -1,0 +1,12 @@
+{
+ "mean5_min_usd": 2000000.0,
+ "rule": "$100k/mean5 < 5%  <=>  mean5 > $2M",
+ "n_base": 2294792,
+ "n_pos_lt_m098": 33729,
+ "n_liq": 431404,
+ "n_short_unf": 33729,
+ "n_short_liq": 3389,
+ "frac_short_kept": 0.10047733404488719,
+ "mean5_on_short_unf_p50": 33040.9,
+ "mean5_on_short_liq_p50": 6206634.0
+}
