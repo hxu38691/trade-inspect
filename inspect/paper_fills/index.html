@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>IB Paper Fills · DUT165368</title>
+<script src="lightweight-charts.standalone.production.js"></script>
+<style>
+:root{--bg:#131722;--pn:#1e222d;--bd:#2a2e39;--tx:#d1d4dc;--mu:#787b86;--up:#26a69a;--dn:#ef5350;--ac:#2962ff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:12px/1.35 -apple-system,Segoe UI,Roboto,"PingFang SC","Microsoft YaHei",sans-serif}
+#top{padding:8px 12px;border-bottom:1px solid var(--bd);background:var(--pn);display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline}
+#top b{font-size:14px}#top .mu{color:var(--mu)}#top a{color:var(--ac)}
+#app{display:flex;height:calc(100vh - 42px)}
+#left{width:520px;min-width:380px;display:flex;flex-direction:column;border-right:1px solid var(--bd);background:var(--pn)}
+#right{flex:1;display:flex;flex-direction:column;min-width:0}
+#ctl{padding:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;border-bottom:1px solid var(--bd)}
+#ctl label{display:flex;flex-direction:column;color:var(--mu);font-size:11px}
+#ctl input,#ctl select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:3px;padding:3px 4px;margin-top:2px}
+#ctl .chk{flex-direction:row;align-items:center;gap:4px;color:var(--tx)}
+#stats{padding:4px 8px;color:var(--mu);border-bottom:1px solid var(--bd)}
+#stats b{color:var(--tx)}
+#thead,#tbody .r{display:grid;grid-template-columns:56px 44px 40px 52px 52px 64px 70px 70px;gap:0 4px;padding:0 8px;align-items:center}
+#thead{height:24px;border-bottom:1px solid var(--bd);color:var(--mu)}
+#tbody{flex:1;overflow-y:auto;position:relative}
+#tbody .r{position:absolute;left:0;right:0;height:22px;cursor:pointer;border-bottom:1px solid #22262f;font-variant-numeric:tabular-nums}
+#tbody .r:hover{background:#2a2e39}#tbody .r.sel{background:#1c3a7a}
+.pos{color:var(--up)}.neg{color:var(--dn)}.mu{color:var(--mu)}
+#info{padding:6px 10px;border-bottom:1px solid var(--bd);min-height:52px;display:flex;flex-wrap:wrap;gap:4px 16px}
+#info .k{color:var(--mu)}#info .big{font-size:15px;font-weight:600}
+#chart{flex:1;position:relative;min-height:0}
+#legend{position:absolute;left:10px;top:6px;z-index:3;pointer-events:none;background:rgba(19,23,34,.55);padding:2px 6px;border-radius:3px}
+#bar{padding:4px 10px;border-top:1px solid var(--bd);color:var(--mu);display:flex;gap:10px;align-items:center}
+#bar button{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:3px;padding:2px 8px;cursor:pointer}
+#loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:var(--mu);background:rgba(19,23,34,.35);z-index:5}
+</style>
+</head>
+<body>
+<div id="top">
+  <b>IB Paper Fills · DUT165368</b>
+  <span class="mu" id="metaLine">加载中…</span>
+  <a href="../e1fv2_liq_avg5/">回测 dashboard</a>
+</div>
+<div id="app">
+  <div id="left">
+    <div id="ctl">
+      <label>股票<input id="fTk" placeholder="AAPL"></label>
+      <label>状态<select id="fSt"><option value="">全部</option><option value="closed">已平仓</option><option value="open">持仓中</option></select></label>
+      <label>方向<select id="fSide"><option value="">全部</option><option value="long">多</option><option value="short">空</option></select></label>
+      <label>入场日期从<input id="fD0" type="date"></label>
+      <label>到<input id="fD1" type="date"></label>
+      <label class="chk"><input id="fSeed" type="checkbox" checked>含历史 seed</label>
+    </div>
+    <div id="stats"></div>
+    <div id="thead">
+      <div>状态</div><div>方向</div><div>代码</div><div>数量</div><div>入场</div><div>出场/标记</div><div>净$ </div><div>时间</div>
+    </div>
+    <div id="tbody"></div>
+  </div>
+  <div id="right">
+    <div id="info"><span class="mu">点左边一笔。入场↓ / 出场↑ 标在 15m K 线上；持仓画入场价虚线与标记价。</span></div>
+    <div id="chart"><div id="legend"></div><div id="loading">加载 K 线…</div></div>
+    <div id="bar">
+      <button id="bPrev">◀</button><button id="bNext">▶</button><button id="bFit">适应</button>
+      <span id="foot"></span>
+    </div>
+  </div>
+</div>
+<script>
+'use strict';
+const LWC = window.LightweightCharts;
+const $ = id => document.getElementById(id);
+const fx = (v,d=2) => (v==null||Number.isNaN(+v)) ? '—' : Number(v).toFixed(d);
+const cls = v => v>0?'pos':(v<0?'neg':'');
+const fmtT = s => {
+  if(!s) return '—';
+  const d = typeof s==='number' ? new Date(s*1000) : new Date(s);
+  if(Number.isNaN(d.getTime())) return String(s);
+  return d.toISOString().slice(0,16).replace('T',' ') + 'Z';
+};
+const dayOf = s => {
+  if(!s) return '';
+  const d = typeof s==='number' ? new Date(s*1000) : new Date(s);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0,10);
+};
+
+let DATA=null, ROWS=[], idx=[], sel=-1, curBars=[], curSym=null;
+const chart = LWC.createChart($('chart'), {
+  autoSize:true,
+  layout:{background:{color:'#131722'}, textColor:'#d1d4dc'},
+  grid:{vertLines:{color:'#2a2e39'}, horzLines:{color:'#2a2e39'}},
+  rightPriceScale:{borderColor:'#2a2e39'},
+  timeScale:{borderColor:'#2a2e39', timeVisible:true, secondsVisible:false}
+});
+const cs = chart.addCandlestickSeries({upColor:'#26a69a', downColor:'#ef5350', borderVisible:false, wickUpColor:'#26a69a', wickDownColor:'#ef5350'});
+const mk = cs; // markers via cs.setMarkers
+const eLine = chart.addLineSeries({color:'#ffc107', lineWidth:1, lineStyle:2, priceLineVisible:false, lastValueVisible:false});
+const xLine = chart.addLineSeries({color:'#00e676', lineWidth:1, lineStyle:2, priceLineVisible:false, lastValueVisible:false});
+
+async function loadData(){
+  const r = await fetch('paper_fills.json?ts='+Date.now());
+  DATA = await r.json();
+  const m=DATA.meta||{};
+  const a=DATA.account||{};
+  const nl=(a.NetLiquidation||{}).value;
+  $('metaLine').textContent = `同步 ${m.synced_at||'—'} · 成交 ${m.n_fills_live||0} · 平仓 ${m.n_closed||0}（seed ${m.n_closed_seed||0}/live ${m.n_closed_live||0}）· 持仓 ${m.n_open||0} · 平仓净合计 $${fx(m.sum_net_usd_closed,2)} · 净值 $${nl||'—'}`;
+  buildRows();
+}
+function buildRows(){
+  const closed=(DATA.trades||[]).map(t=>({...t,_k:'closed'}));
+  const open=(DATA.open||[]).map(t=>({...t,_k:'open'}));
+  ROWS = open.concat(closed).reverse(); // newest / open first
+  applyFilter();
+}
+function applyFilter(){
+  const tk=($('fTk').value||'').trim().toUpperCase();
+  const st=$('fSt').value, side=$('fSide').value;
+  const d0=$('fD0').value, d1=$('fD1').value;
+  const seedOn=$('fSeed').checked;
+  idx=[];
+  let net=0,n=0,w=0;
+  for(let i=0;i<ROWS.length;i++){
+    const r=ROWS[i];
+    if(st && r.status!==st && !(st==='closed'&&r.status==='closed') && !(st==='open'&&r.status==='open')) continue;
+    if(st==='closed' && r.status!=='closed') continue;
+    if(st==='open' && r.status!=='open') continue;
+    if(side && r.side!==side) continue;
+    if(tk && r.symbol!==tk) continue;
+    if(!seedOn && r.source==='box_orders_enriched') continue;
+    const day = dayOf(r.exit_time||r.entry_time);
+    if(d0 && day && day<d0) continue;
+    if(d1 && day && day>d1) continue;
+    idx.push(i);
+    if(r.status==='closed' && r.net_usd!=null){ net+=r.net_usd; n++; if(r.net_usd>0)w++; }
+  }
+  $('stats').innerHTML = `显示 <b>${idx.length}</b> / ${ROWS.length} · 筛后平仓净 <b class="${cls(net)}">$${fx(net,2)}</b>${n?` · 胜率 ${(100*w/n).toFixed(0)}% (${w}/${n})`:''}`;
+  renderList();
+  if(idx.length) select(0); else { sel=-1; $('info').innerHTML='<span class="mu">无匹配交易</span>'; cs.setData([]); eLine.setData([]); xLine.setData([]); }
+}
+function renderList(){
+  const h=22, tot=idx.length;
+  $('tbody').style.height = Math.max(tot*h, 100)+'px';
+  $('tbody').innerHTML='';
+  // virtual-ish: render all if <2000
+  const frag=document.createDocumentFragment();
+  for(let r=0;r<tot;r++){
+    const i=idx[r], t=ROWS[i];
+    const div=document.createElement('div');
+    div.className='r'+(r===sel?' sel':'');
+    div.style.top=(r*h)+'px';
+    const px = t.status==='open' ? t.mark_px : t.exit_px;
+    const net = t.net_usd;
+    const when = (t.exit_time||t.entry_time||'').toString().slice(5,16).replace('T',' ');
+    div.innerHTML = `<div>${t.status==='open'?'持仓':'平仓'}</div><div>${t.side==='long'?'多':'空'}</div><div>${t.symbol}</div><div>${fx(t.qty,0)}</div><div>${fx(t.entry_px)}</div><div>${fx(px)}</div><div class="${cls(net)}">${fx(net,2)}</div><div class="mu">${when}</div>`;
+    div.onclick=()=>select(r);
+    frag.appendChild(div);
+  }
+  $('tbody').appendChild(frag);
+}
+function barIndexAtOrBefore(bars, ts){
+  let lo=0,hi=bars.length-1,ans=0;
+  while(lo<=hi){ const m=(lo+hi)>>1; if(bars[m].time<=ts){ans=m;lo=m+1;} else hi=m-1; }
+  return ans;
+}
+async function getBars(sym){
+  const safe=encodeURIComponent(sym.replace(/\//g,'_'));
+  const r=await fetch('bars/'+safe+'.json?ts='+Date.now());
+  if(!r.ok) throw new Error('无 K 线 '+sym+'（同步器加 --bars）');
+  const j=await r.json();
+  return j.bars||[];
+}
+async function select(r){
+  if(r<0||r>=idx.length) return;
+  sel=r; renderList();
+  const t=ROWS[idx[r]];
+  $('info').innerHTML = `<span class="big">${t.symbol}</span>
+    <span class="k">${t.status==='open'?'持仓':'平仓'} · ${t.side==='long'?'多':'空'} · ${t.source||''}</span>
+    <span><span class="k">数量</span> ${fx(t.qty,0)}</span>
+    <span><span class="k">入场</span> ${fmtT(t.entry_time)} @ <b>${fx(t.entry_px)}</b></span>
+    <span><span class="k">${t.status==='open'?'标记':'出场'}</span> ${fmtT(t.exit_time)} @ <b>${fx(t.status==='open'?t.mark_px:t.exit_px)}</b></span>
+    <span><span class="k">净$</span> <b class="${cls(t.net_usd)}">${fx(t.net_usd,2)}</b>
+      ${t.gross_usd!=null?` <span class="k">毛</span> ${fx(t.gross_usd,2)}`:''}
+      ${t.commission_usd!=null?` <span class="k">佣</span> ${fx(t.commission_usd,2)}`:''}
+      ${t.unrealized_pnl_usd!=null?` <span class="k">浮盈</span> <span class="${cls(t.unrealized_pnl_usd)}">${fx(t.unrealized_pnl_usd,2)}</span>`:''}
+    </span>`;
+  $('loading').style.display='flex';
+  try{
+    if(curSym!==t.symbol){
+      curBars = await getBars(t.symbol);
+      cs.setData(curBars);
+      curSym=t.symbol;
+    }
+  }catch(e){
+    $('loading').style.display='none';
+    $('foot').textContent=String(e.message||e);
+    cs.setData([]); eLine.setData([]); xLine.setData([]);
+    try{ cs.setMarkers([]); }catch(_){}
+    return;
+  }
+  $('loading').style.display='none';
+  const markers=[];
+  const et = t.entry_time ? Math.floor(new Date(t.entry_time).getTime()/1000) : null;
+  const xt = t.exit_time ? Math.floor(new Date(t.exit_time).getTime()/1000) : null;
+  // snap markers to nearest bar time
+  const snap = (ts)=>{
+    if(ts==null||!curBars.length) return null;
+    const i=barIndexAtOrBefore(curBars, ts);
+    return curBars[i].time;
+  };
+  const etb=snap(et), xtb=snap(xt);
+  if(etb!=null) markers.push({time:etb, position:'aboveBar', color: t.side==='long'?'#00e676':'#ff1744', shape:'arrowDown', text:(t.side==='long'?'多 ':'空 ')+fx(t.entry_px)});
+  if(xtb!=null) markers.push({time:xtb, position:'belowBar', color:'#26a69a', shape:'arrowUp', text:'平 '+fx(t.exit_px)});
+  markers.sort((a,b)=>a.time-b.time);
+  cs.setMarkers(markers);
+  // price lines
+  if(t.entry_px!=null && curBars.length){
+    const t0=curBars[0].time, t1=curBars[curBars.length-1].time;
+    const a = etb||t0, b = xtb||t1;
+    eLine.setData([{time:a,value:t.entry_px},{time:b,value:t.entry_px}]);
+    if(t.exit_px!=null && xtb!=null) xLine.setData([{time:xtb,value:t.exit_px},{time:t1,value:t.exit_px}]);
+    else if(t.mark_px!=null) xLine.setData([{time:a,value:t.mark_px},{time:t1,value:t.mark_px}]);
+    else xLine.setData([]);
+  } else { eLine.setData([]); xLine.setData([]); }
+  // fit around trade
+  if(curBars.length){
+    const ei = etb!=null ? barIndexAtOrBefore(curBars, etb) : 0;
+    const xi = xtb!=null ? barIndexAtOrBefore(curBars, xtb) : Math.min(curBars.length-1, ei+20);
+    const a=Math.max(0, ei-32), b=Math.min(curBars.length-1, Math.max(xi,ei)+16);
+    chart.timeScale().setVisibleRange({from:curBars[a].time, to:curBars[b].time});
+  }
+  $('foot').textContent = `${sel+1}/${idx.length} · K线 ${curBars.length} 根 15m`;
+}
+function step(d){ if(!idx.length) return; select(Math.min(idx.length-1, Math.max(0, sel+d))); }
+$('bPrev').onclick=()=>step(-1); $('bNext').onclick=()=>step(1);
+$('bFit').onclick=()=>chart.timeScale().fitContent();
+for(const id of ['fTk','fD0','fD1']) $(id).addEventListener('input',()=>applyFilter());
+for(const id of ['fSt','fSide','fSeed']) $(id).addEventListener('change',()=>applyFilter());
+chart.subscribeCrosshairMove(p=>{
+  if(!p||!p.time){ $('legend').textContent=''; return; }
+  const b=p.seriesData.get(cs);
+  let s=fmtT(p.time);
+  if(b) s+=` O ${fx(b.open)} H ${fx(b.high)} L ${fx(b.low)} C ${fx(b.close)}`;
+  $('legend').textContent=s;
+});
+loadData().catch(e=>{ $('metaLine').textContent='加载失败: '+e; });
+</script>
+</body>
+</html>

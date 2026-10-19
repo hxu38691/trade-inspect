@@ -7,6 +7,20 @@ h3{margin-top:28px;color:#d4760a} code{background:#1c2330;padding:1px 6px;border
 <p class='note'>Arrow keys / prev-next. Charts = ctx128 + hold. Lazy-loaded shards where noted.</p>
 
 
+
+
+<h3 id="e1fv2-liq-avg5">e1fv2@19400 · mean5>$2M 流动性 · 逐笔K线</h3>
+<ul>
+<li><a href="inspect/e1fv2_liq_avg5/">inspect/e1fv2_liq_avg5/</a></li>
+</ul>
+
+<h3 id="paper-fills">IB Paper Fills（DUT165368 · 模拟盘真实成交）</h3>
+<p class="warn">来自阿里云美国 ECS 上 IB Gateway paper（只读）。历史平仓 seed 自 09-25 / 10-06 paper_live 日志；Gateway 当前无当日成交时显示持仓浮盈 + seed。每笔可看 15m K 线入场↓/出场↑ 与美元盈亏。</p>
+<ul>
+<li><a href="inspect/paper_fills/">inspect/paper_fills/</a> — 交互看板（lightweight-charts）</li>
+<li><a href="inspect/paper_fills/paper_fills.json">paper_fills.json</a> — 成交/平仓/持仓 JSON</li>
+</ul>
+
 <h3 id="e1fv2-short-avg5">e1fv2@19400 SHORT · avg5&gt;$2M（$10万吃不到5%）</h3>
 <p class='warn'>全市场截面空头 pos&amp;lt;−0.98；流动性筛：近5根平均成交额 &gt; $2M。对照未筛 vs 筛后 CAGR/Sharpe/权益曲线。</p>
 <ul>
