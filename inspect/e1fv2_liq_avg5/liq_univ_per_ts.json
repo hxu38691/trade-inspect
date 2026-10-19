@@ -1,0 +1,62 @@
+{
+  "panel": "/root/autodl-tmp/hold_eval_s12000_val_pos098",
+  "sum5": "/root/autodl-tmp/e1fv2_liq5med/sum5_prior5.npy",
+  "mean5_defn": "mean5 = sum5/5; sum5 = sum of dollar volume (close*volume) over 5 RTH bars ending at signal bar inclusive (signal bar + 4 prior RTH bars)",
+  "liq_filter": "mean5 > 2e6 USD  (i.e. $100k capital eats <5% of mean5)",
+  "base_universe": "RTH (minute 570-945), raw price $10-100; panel already capped",
+  "n_panel": 2294792,
+  "n_base_rows": 2294792,
+  "n_liq_rows": 431404,
+  "frac_liq_of_base": 0.18799263724119658,
+  "minute_range_panel": [
+    570,
+    930
+  ],
+  "px_range_panel": [
+    10.0,
+    100.0
+  ],
+  "spot_check_one_row_per_sym": [
+    {
+      "ts": 1687786200000000000,
+      "n_rows": 1579,
+      "n_sym": 1579
+    },
+    {
+      "ts": 1687787100000000000,
+      "n_rows": 25,
+      "n_sym": 25
+    },
+    {
+      "ts": 1687788000000000000,
+      "n_rows": 14,
+      "n_sym": 14
+    }
+  ],
+  "base_px10_100_rth": {
+    "label": "base $10-100 RTH",
+    "n_ts": 10074,
+    "n_rows": 2294792,
+    "names_per_ts": {
+      "mean": 227.79352789358745,
+      "median": 227.0,
+      "p10": 206.0,
+      "p90": 251.0,
+      "min": 1,
+      "max": 1579
+    }
+  },
+  "after_mean5_gt_2m": {
+    "label": "after mean5>$2M",
+    "n_ts": 9986,
+    "n_rows": 431404,
+    "names_per_ts": {
+      "mean": 43.200881233727216,
+      "median": 38.0,
+      "p10": 25.0,
+      "p90": 72.0,
+      "min": 1,
+      "max": 369
+    }
+  }
+}

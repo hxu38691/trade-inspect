@@ -1,0 +1,17 @@
+{
+ "px_lo": 10.0,
+ "px_hi": 100.0,
+ "note": "panel hold_eval_s12000_val_pos098 is capped at raw $100; price $10-100 + avg5_gt2m (mean5>$2M) liquidity filter",
+ "px_rth_min": 10.0,
+ "px_rth_max": 100.0,
+ "n_base_px10_100": 2294792,
+ "n_base_px50_100": 556817,
+ "mean5_min_usd": 2000000.0,
+ "n_pos_lt_m098": 33729,
+ "n_liq": 431404,
+ "n_short_unf": 33729,
+ "n_short_liq": 3389,
+ "frac_short_kept": 0.10047733404488719,
+ "univ_names_per_ts_median": 227.0,
+ "n_ts": 10074
+}
