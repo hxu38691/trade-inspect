@@ -3,7 +3,20 @@
 <head>
 <meta charset="utf-8">
 <title>IB Paper Fills · DUT165368</title>
-<script src="lightweight-charts.standalone.production.js"></script>
+<script>
+window.__dashBoot = Date.now();
+window.__dashReady = false;
+setTimeout(function(){
+  if(!window.__dashReady){
+    var el=document.getElementById('metaLine');
+    if(el && /加载中/.test(el.textContent||'')){
+      el.textContent='加载超时：连不上本页资源（常见于 github.io）。请 SSH 隧道开 http://127.0.0.1:8088/ 或开本机本地副本。';
+      el.style.color='#ef5350';
+    }
+  }
+}, 12000);
+</script>
+<script src="lightweight-charts.standalone.production.js" onerror="(function(){var el=document.getElementById('metaLine'); if(el){el.textContent='图表脚本加载失败（网络/github.io）。改用本地 8088 隧道。'; el.style.color='#ef5350';}})()"></script>
 <style>
 :root{--bg:#131722;--pn:#1e222d;--bd:#2a2e39;--tx:#d1d4dc;--mu:#787b86;--up:#26a69a;--dn:#ef5350;--ac:#2962ff}
 *{box-sizing:border-box}
@@ -97,12 +110,20 @@ const eLine = chart.addLineSeries({color:'#ffc107', lineWidth:1, lineStyle:2, pr
 const xLine = chart.addLineSeries({color:'#00e676', lineWidth:1, lineStyle:2, priceLineVisible:false, lastValueVisible:false});
 
 async function loadData(){
-  const r = await fetch('paper_fills.json?ts='+Date.now());
+  const ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  const to = ctrl ? setTimeout(()=>ctrl.abort(), 10000) : null;
+  let r;
+  try{
+    r = await fetch('paper_fills.json?ts='+Date.now(), ctrl?{signal:ctrl.signal}:{});
+  } finally { if(to) clearTimeout(to); }
+  if(!r.ok) throw new Error('paper_fills.json HTTP '+r.status);
   DATA = await r.json();
+  window.__dashReady = true;
   const m=DATA.meta||{};
   const a=DATA.account||{};
   const nl=(a.NetLiquidation||{}).value;
   $('metaLine').textContent = `同步 ${m.synced_at||'—'} · 成交 ${m.n_fills_live||0} · 平仓 ${m.n_closed||0}（seed ${m.n_closed_seed||0}/live ${m.n_closed_live||0}）· 持仓 ${m.n_open||0} · 平仓净合计 $${fx(m.sum_net_usd_closed,2)} · 净值 $${nl||'—'}`;
+  $('metaLine').style.color='';
   buildRows();
 }
 function buildRows(){
@@ -163,7 +184,14 @@ function barIndexAtOrBefore(bars, ts){
 }
 async function getBars(sym){
   const safe=encodeURIComponent(sym.replace(/\//g,'_'));
-  const r=await fetch('bars/'+safe+'.json?ts='+Date.now());
+  const ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  const to = ctrl ? setTimeout(()=>ctrl.abort(), 8000) : null;
+  let r;
+  try{
+    r=await fetch('bars/'+safe+'.json?ts='+Date.now(), ctrl?{signal:ctrl.signal}:{});
+  } catch(e){
+    throw new Error('K线超时/失败 '+sym);
+  } finally { if(to) clearTimeout(to); }
   if(!r.ok) throw new Error('无 K 线 '+sym+'（同步器加 --bars）');
   const j=await r.json();
   return j.bars||[];
@@ -241,7 +269,7 @@ chart.subscribeCrosshairMove(p=>{
   if(b) s+=` O ${fx(b.open)} H ${fx(b.high)} L ${fx(b.low)} C ${fx(b.close)}`;
   $('legend').textContent=s;
 });
-loadData().catch(e=>{ $('metaLine').textContent='加载失败: '+e; });
+loadData().catch(e=>{ window.__dashReady=true; $('metaLine').textContent='加载失败: '+(e&&e.name==='AbortError'?'超时（github.io 不通？用 SSH 隧道 8088）':(e&&e.message||e)); $('metaLine').style.color='#ef5350'; });
 </script>
 </body>
 </html>

@@ -3,7 +3,7 @@
     "title": "IB paper fills → dashboard",
     "account": "DUT165368",
     "host": "127.0.0.1:4002",
-    "synced_at": "2026-10-20T00:32:59.379738+00:00",
+    "synced_at": "2026-10-20T00:41:02.389443+00:00",
     "n_fills_live": 235,
     "n_closed": 566,
     "n_closed_seed": 485,
@@ -47,7 +47,7 @@
   },
   "account": {
     "BuyingPower": {
-      "value": "120335.04",
+      "value": "120022.49",
       "currency": "USD"
     },
     "GrossPositionValue": {
